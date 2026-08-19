@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>活字帳 — PowerPointフォント一括変換</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;500;600;800&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+:root{
+  --ink: #1A1F2E;
+  --ink-soft: #262C40;
+  --paper: #F7F3EA;
+  --paper-dim: #EDE7D8;
+  --vermilion: #C6432E;
+  --vermilion-soft: #E3846F;
+  --stone: #8B8578;
+  --line: rgba(247,243,234,0.14);
+  --line-strong: rgba(247,243,234,0.28);
+}
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{
+  margin:0;
+  background:var(--ink);
+  color:var(--paper);
+  font-family:"Zen Kaku Gothic New", sans-serif;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+@media (prefers-reduced-motion: reduce){
+  *{animation-duration:0.01ms !important; transition-duration:0.01ms !important;}
+}
+
+/* subtle grid texture */
+body::before{
+  content:"";
+  position:fixed; inset:0;
+  background-image:
+    linear-gradient(var(--line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  background-size: 64px 64px;
+  opacity:0.35;
+  pointer-events:none;
+  z-index:0;
+  mask-image: radial-gradient(ellipse 100% 60% at 50% 0%, black 30%, transparent 75%);
+}
+
+.wrap{position:relative; z-index:1; max-width:1040px; margin:0 auto; padding:0 28px;}
+
+/* ---------- Header / hero ---------- */
+header.hero{
+  padding:88px 0 64px;
+  text-align:center;
+  border-bottom:1px solid var(--line);
+}
+.eyebrow{
+  font-family:"Shippori Mincho", serif;
+  font-size:13px;
+  letter-spacing:0.42em;
+  color:var(--vermilion-soft);
+  margin:0 0 22px;
+  text-transform:uppercase;
+}
+h1.title{
+  font-family:"Shippori Mincho", serif;
+  font-weight:800;
+  font-size:clamp(40px, 6vw, 72px);
+  line-height:1.25;
+  margin:0 0 8px;
+  letter-spacing:0.02em;
+}
+h1.title .accent{ color:var(--vermilion); }
+p.lede{
+  font-size:16px;
+  color:var(--stone);
+  max-width:520px;
+  margin:20px auto 0;
+  line-height:1.9;
+}
+.hero-rule{
+  display:flex; align-items:center; justify-content:center; gap:14px;
+  margin-top:36px; color:var(--stone); font-size:12px; letter-spacing:0.14em;
+}
+.hero-rule .dash{ width:40px; height:1px; background:var(--line-strong); }
+
+/* ---------- sections ---------- */
+section{ padding:72px 0; border-bottom:1px solid var(--line); }
+section:last-of-type{ border-bottom:none; }
+.step-head{ display:flex; align-items:baseline; gap:16px; margin-bottom:36px; }
+.step-num{
+  font-family:"Shippori Mincho", serif;
+  font-size:15px;
+  color:var(--vermilion-soft);
+  letter-spacing:0.08em;
+  white-space:nowrap;
+}
+.step-title{
+  font-family:"Shippori Mincho", serif;
+  font-weight:600;
+  font-size:26px;
+  margin:0;
+}
+.step-sub{ color:var(--stone); font-size:14px; margin:6px 0 0; }
+
+/* ---------- upload ---------- */
+.dropzone{
+  border:1.5px dashed var(--line-strong);
+  border-radius:4px;
+  padding:56px 28px;
+  text-align:center;
+  cursor:pointer;
+  transition: border-color 0.25s ease, background 0.25s ease;
+  background: rgba(247,243,234,0.02);
+  position:relative;
+}
+.dropzone:hover, .dropzone.drag{
+  border-color: var(--vermilion-soft);
+  background: rgba(198,67,46,0.06);
+}
+.dropzone:focus-visible{ outline:2px solid var(--vermilion-soft); outline-offset:4px; }
+.dropzone-icon{
+  width:44px; height:44px; margin:0 auto 18px;
+  border:1px solid var(--line-strong);
+  border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  color:var(--vermilion-soft);
+}
+.dropzone-text{ font-size:15px; }
+.dropzone-text b{ color:var(--paper); font-weight:700; }
+.dropzone-meta{ font-size:12px; color:var(--stone); margin-top:8px; }
+input[type=file]{ display:none; }
+
+.file-chip{
+  display:none;
+  align-items:center; gap:12px;
+  margin-top:20px;
+  padding:14px 18px;
+  border:1px solid var(--line-strong);
+  border-radius:4px;
+  font-size:14px;
+  background:rgba(247,243,234,0.03);
+}
+.file-chip.show{ display:flex; }
+.file-chip .name{ flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.file-chip .clear{
+  background:none; border:none; color:var(--stone); cursor:pointer;
+  font-size:13px; text-decoration:underline; padding:4px;
+}
+.file-chip .clear:hover{ color:var(--vermilion-soft); }
+
+/* ---------- specimen cards (font list) ---------- */
+#specimenSection{ display:none; }
+#specimenSection.show{ display:block; }
+.specimen-grid{ display:flex; flex-direction:column; gap:1px; background:var(--line); border:1px solid var(--line); border-radius:4px; overflow:hidden; }
+.specimen-card{
+  background:var(--ink);
+  padding:28px 26px;
+  display:grid;
+  grid-template-columns:1fr 260px;
+  gap:24px;
+  align-items:center;
+}
+@media (max-width:640px){
+  .specimen-card{ grid-template-columns:1fr; }
+}
+.specimen-left{ min-width:0; }
+.specimen-label{
+  font-size:11px; letter-spacing:0.12em; color:var(--stone); text-transform:uppercase;
+  margin-bottom:10px; display:flex; align-items:center; gap:8px;
+}
+.specimen-count{
+  background:rgba(198,67,46,0.16); color:var(--vermilion-soft);
+  border-radius:20px; padding:1px 9px; font-size:10.5px;
+}
+.specimen-original{
+  font-size:30px;
+  line-height:1.3;
+  color:var(--paper);
+  overflow-wrap:anywhere;
+}
+.specimen-sample{
+  font-size:15px; color:var(--stone); margin-top:6px;
+}
+.specimen-right{ display:flex; flex-direction:column; gap:6px; }
+.specimen-right label{ font-size:11px; color:var(--stone); letter-spacing:0.06em; }
+.font-input{
+  background:var(--paper);
+  color:var(--ink);
+  border:1px solid transparent;
+  border-radius:3px;
+  padding:11px 13px;
+  font-size:14px;
+  font-family:"Zen Kaku Gothic New", sans-serif;
+  width:100%;
+  transition: box-shadow 0.2s ease;
+}
+.font-input::placeholder{ color:#9c9484; }
+.font-input:focus{ outline:none; box-shadow:0 0 0 2px var(--vermilion-soft); }
+.font-input.filled{ box-shadow:0 0 0 2px var(--vermilion); }
+datalist{}
+
+/* ---------- theme toggle ---------- */
+.theme-row{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:16px; margin-top:28px; padding-top:28px; border-top:1px solid var(--line);
+}
+.theme-row-text b{ display:block; font-size:14px; margin-bottom:4px; }
+.theme-row-text span{ font-size:12.5px; color:var(--stone); }
+.switch{
+  position:relative; width:46px; height:26px; flex:none;
+}
+.switch input{ opacity:0; width:0; height:0; }
+.switch-track{
+  position:absolute; inset:0; background:var(--line-strong); border-radius:20px;
+  cursor:pointer; transition: background 0.2s ease;
+}
+.switch-track::before{
+  content:""; position:absolute; width:20px; height:20px; left:3px; top:3px;
+  background:var(--paper); border-radius:50%; transition: transform 0.2s ease;
+}
+.switch input:checked + .switch-track{ background:var(--vermilion); }
+.switch input:checked + .switch-track::before{ transform:translateX(20px); }
+.switch input:focus-visible + .switch-track{ outline:2px solid var(--vermilion-soft); outline-offset:3px; }
+
+.theme-inputs{ display:none; margin-top:18px; grid-template-columns:1fr 1fr 1fr; gap:14px; }
+.theme-inputs.show{ display:grid; }
+@media (max-width:640px){ .theme-inputs.show{ grid-template-columns:1fr; } }
+.theme-inputs label{ font-size:11px; color:var(--stone); letter-spacing:0.06em; display:block; margin-bottom:6px; }
+
+/* ---------- generate ---------- */
+.generate-row{
+  display:flex; align-items:center; gap:20px; flex-wrap:wrap;
+  margin-top:40px;
+}
+.btn{
+  font-family:"Zen Kaku Gothic New", sans-serif;
+  font-weight:700;
+  font-size:15px;
+  border:none;
+  border-radius:3px;
+  padding:16px 34px;
+  cursor:pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  letter-spacing:0.02em;
+}
+.btn-primary{
+  background:var(--vermilion); color:var(--paper);
+}
+.btn-primary:hover:not(:disabled){ background:var(--vermilion-soft); transform:translateY(-1px); }
+.btn-primary:disabled{ background:#4a4433; color:var(--stone); cursor:not-allowed; }
+.btn-primary:focus-visible{ outline:2px solid var(--paper); outline-offset:3px; }
+.status-text{ font-size:13px; color:var(--stone); }
+.status-text.err{ color:var(--vermilion-soft); }
+
+.download-card{
+  display:none;
+  margin-top:28px;
+  padding:26px;
+  border:1px solid var(--line-strong);
+  border-radius:4px;
+  background:rgba(198,67,46,0.06);
+  align-items:center;
+  justify-content:space-between;
+  gap:20px;
+  flex-wrap:wrap;
+}
+.download-card.show{ display:flex; }
+.download-card .dl-text b{ display:block; font-size:15px; margin-bottom:4px; }
+.download-card .dl-text span{ font-size:13px; color:var(--stone); }
+.btn-download{
+  background:var(--paper); color:var(--ink);
+}
+.btn-download:hover{ background:#fff; }
+
+/* ---------- footer ---------- */
+footer{
+  padding:40px 0 60px;
+  text-align:center;
+  color:var(--stone);
+  font-size:12.5px;
+  letter-spacing:0.03em;
+}
+footer .rule{ width:1px; height:36px; background:var(--line-strong); margin:0 auto 24px; }
+
+/* loading spinner */
+.spinner{
+  width:14px; height:14px; border-radius:50%;
+  border:2px solid rgba(247,243,234,0.35); border-top-color:var(--paper);
+  display:inline-block; vertical-align:-2px; margin-right:8px;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin{ to{ transform:rotate(360deg); } }
+
+.fade-in{ animation: fadeIn 0.5s ease both; }
+@keyframes fadeIn{ from{ opacity:0; transform:translateY(8px);} to{opacity:1; transform:none;} }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="hero">
+    <p class="eyebrow">TYPE SPECIMEN &amp; REPLACEMENT TOOL</p>
+    <h1 class="title">活字帳<span class="accent">。</span><br>PowerPoint フォント一括変換</h1>
+    <p class="lede">ファイルを開かずに、使われているフォントを洗い出し、まとめて差し替える。すべてブラウザの中だけで完結し、ファイルはどこにも送信されません。</p>
+    <div class="hero-rule"><span class="dash"></span>UPLOAD → DETECT → REPLACE → DOWNLOAD<span class="dash"></span></div>
+  </header>
+
+  <section id="uploadSection">
+    <div class="step-head">
+      <span class="step-num">01</span>
+      <div>
+        <h2 class="step-title">ファイルを読み込む</h2>
+        <p class="step-sub">.pptx ファイルをドラッグ＆ドロップ、またはクリックして選択</p>
+      </div>
+    </div>
+
+    <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="PowerPointファイルを選択">
+      <div class="dropzone-icon">↑</div>
+      <div class="dropzone-text"><b>ここにドロップ</b> — またはクリックしてファイルを選択</div>
+      <div class="dropzone-meta">.pptx ファイルのみ対応</div>
+      <input type="file" id="fileInput" accept=".pptx">
+    </div>
+
+    <div class="file-chip" id="fileChip">
+      <span class="name" id="fileName"></span>
+      <button class="clear" id="clearFile">取り消す</button>
+    </div>
+
+    <p class="status-text" id="uploadStatus" style="margin-top:14px;"></p>
+  </section>
+
+  <section id="specimenSection">
+    <div class="step-head">
+      <span class="step-num">02 — 03</span>
+      <div>
+        <h2 class="step-title">検出されたフォント</h2>
+        <p class="step-sub">それぞれの活字見本。差し替えたいフォント名を入力すると置換対象になります（未入力のものはそのまま）</p>
+      </div>
+    </div>
+
+    <div class="specimen-grid" id="specimenGrid"></div>
+
+    <div class="theme-row">
+      <div class="theme-row-text">
+        <b>テーマフォント（スライドマスター／レイアウト）も変換する</b>
+        <span>タイトルや本文の既定フォント設定。通常は本文テキストの変換だけで十分です</span>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="themeToggle">
+        <span class="switch-track"></span>
+      </label>
+    </div>
+
+    <div class="theme-inputs" id="themeInputs">
+      <div>
+        <label for="themeMajorLatin">見出し用フォント（英数字）</label>
+        <input type="text" class="font-input" id="themeMajorLatin" placeholder="例: Calibri Light">
+      </div>
+      <div>
+        <label for="themeMajorEa">見出し用フォント（日本語）</label>
+        <input type="text" class="font-input" id="themeMajorEa" placeholder="例: 游ゴシック">
+      </div>
+      <div></div>
+      <div>
+        <label for="themeMinorLatin">本文用フォント（英数字）</label>
+        <input type="text" class="font-input" id="themeMinorLatin" placeholder="例: Calibri">
+      </div>
+      <div>
+        <label for="themeMinorEa">本文用フォント（日本語）</label>
+        <input type="text" class="font-input" id="themeMinorEa" placeholder="例: 游明朝">
+      </div>
+      <div></div>
+    </div>
+
+    <div class="generate-row">
+      <button class="btn btn-primary" id="generateBtn">変換してファイルを生成</button>
+      <span class="status-text" id="generateStatus"></span>
+    </div>
+
+    <div class="download-card" id="downloadCard">
+      <div class="dl-text">
+        <b>変換が完了しました</b>
+        <span id="downloadMeta"></span>
+      </div>
+      <a class="btn btn-download" id="downloadBtn" download>ダウンロード</a>
+    </div>
+  </section>
+
+  <footer>
+    <div class="rule"></div>
+    すべての処理はこのブラウザ内で行われます。ファイルはサーバーに送信されません。
+  </footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  const NS_A = "http://schemas.openxmlformats.org/drawingml/2006/main";
+
+  let zip = null;
+  let originalFileName = "presentation";
+  let fontMap = {}; // originalFontName -> { count, sampleText }
+  let generatedBlobUrl = null;
+
+  const dropzone = document.getElementById('dropzone');
+  const fileInput = document.getElementById('fileInput');
+  const fileChip = document.getElementById('fileChip');
+  const fileName = document.getElementById('fileName');
+  const clearFile = document.getElementById('clearFile');
+  const uploadStatus = document.getElementById('uploadStatus');
+  const specimenSection = document.getElementById('specimenSection');
+  const specimenGrid = document.getElementById('specimenGrid');
+  const themeToggle = document.getElementById('themeToggle');
+  const themeInputs = document.getElementById('themeInputs');
+  const generateBtn = document.getElementById('generateBtn');
+  const generateStatus = document.getElementById('generateStatus');
+  const downloadCard = document.getElementById('downloadCard');
+  const downloadBtn = document.getElementById('downloadBtn');
+  const downloadMeta = document.getElementById('downloadMeta');
+
+  dropzone.addEventListener('click', () => fileInput.click());
+  dropzone.addEventListener('keydown', (e) => {
+    if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); fileInput.click(); }
+  });
+  ['dragenter','dragover'].forEach(ev => {
+    dropzone.addEventListener(ev, (e) => { e.preventDefault(); dropzone.classList.add('drag'); });
+  });
+  ['dragleave','drop'].forEach(ev => {
+    dropzone.addEventListener(ev, (e) => { e.preventDefault(); dropzone.classList.remove('drag'); });
+  });
+  dropzone.addEventListener('drop', (e) => {
+    const f = e.dataTransfer.files[0];
+    if(f) handleFile(f);
+  });
+  fileInput.addEventListener('change', (e) => {
+    const f = e.target.files[0];
+    if(f) handleFile(f);
+  });
+  clearFile.addEventListener('click', resetAll);
+
+  function resetAll(){
+    zip = null;
+    fontMap = {};
+    fileInput.value = '';
+    fileChip.classList.remove('show');
+    specimenSection.classList.remove('show');
+    downloadCard.classList.remove('show');
+    uploadStatus.textContent = '';
+    generateStatus.textContent = '';
+    if(generatedBlobUrl){ URL.revokeObjectURL(generatedBlobUrl); generatedBlobUrl = null; }
+  }
+
+  async function handleFile(file){
+    if(!file.name.toLowerCase().endsWith('.pptx')){
+      uploadStatus.textContent = '.pptx ファイルを選択してください。';
+      uploadStatus.classList.add('err');
+      return;
+    }
+    uploadStatus.classList.remove('err');
+    uploadStatus.textContent = '読み込み中...';
+    originalFileName = file.name.replace(/\.pptx$/i, '');
+    fileName.textContent = file.name;
+    fileChip.classList.add('show');
+
+    try{
+      const buf = await file.arrayBuffer();
+      zip = await JSZip.loadAsync(buf);
+      await scanFonts();
+      uploadStatus.textContent = `完了 — ${Object.keys(fontMap).length} 種類のフォントを検出しました`;
+      renderSpecimens();
+      specimenSection.classList.add('show');
+      specimenSection.scrollIntoView({behavior:'smooth', block:'start'});
+    }catch(err){
+      console.error(err);
+      uploadStatus.classList.add('err');
+      uploadStatus.textContent = 'ファイルの読み込みに失敗しました。有効な .pptx ファイルか確認してください。';
+    }
+  }
+
+  function getSlideFiles(){
+    return Object.keys(zip.files)
+      .filter(name => /^ppt\/slides\/slide\d+\.xml$/.test(name))
+      .sort((a,b) => {
+        const na = parseInt(a.match(/slide(\d+)\.xml/)[1]);
+        const nb = parseInt(b.match(/slide(\d+)\.xml/)[1]);
+        return na - nb;
+      });
+  }
+
+  async function scanFonts(){
+    fontMap = {};
+    const slideFiles = getSlideFiles();
+    for(const path of slideFiles){
+      const xmlText = await zip.file(path).async('string');
+      const doc = new DOMParser().parseFromString(xmlText, 'application/xml');
+      collectFontsFromDoc(doc);
+    }
+  }
+
+  function collectFontsFromDoc(doc){
+    // collect typeface elements: a:latin, a:ea, a:cs within a:rPr / a:defRPr / a:endParaRPr
+    const tags = ['latin', 'ea', 'cs'];
+    tags.forEach(tag => {
+      const els = doc.getElementsByTagNameNS(NS_A, tag);
+      for(let i=0; i<els.length; i++){
+        const el = els[i];
+        const typeface = el.getAttribute('typeface');
+        if(!typeface || typeface === '+mj-lt' || typeface === '+mn-lt' ||
+           typeface === '+mj-ea' || typeface === '+mn-ea' ||
+           typeface === '+mj-cs' || typeface === '+mn-cs'){
+          continue; // theme references, not literal font names
+        }
+        if(!fontMap[typeface]){
+          fontMap[typeface] = { count: 0 };
+        }
+        fontMap[typeface].count++;
+      }
+    });
+  }
+
+  function renderSpecimens(){
+    specimenGrid.innerHTML = '';
+    const names = Object.keys(fontMap).sort((a,b) => fontMap[b].count - fontMap[a].count);
+
+    if(names.length === 0){
+      specimenGrid.innerHTML = '<div class="specimen-card"><div class="specimen-left"><div class="specimen-original">明示的なフォント指定が見つかりませんでした</div><div class="specimen-sample">このファイルはテーマフォントのみを使用している可能性があります。下の「テーマフォントも変換する」をご利用ください。</div></div><div></div></div>';
+      return;
+    }
+
+    names.forEach((name, idx) => {
+      const info = fontMap[name];
+      const card = document.createElement('div');
+      card.className = 'specimen-card fade-in';
+      card.style.animationDelay = (idx * 0.05) + 's';
+
+      const left = document.createElement('div');
+      left.className = 'specimen-left';
+
+      const label = document.createElement('div');
+      label.className = 'specimen-label';
+      label.innerHTML = `検出フォント <span class="specimen-count">${info.count}箇所</span>`;
+
+      const original = document.createElement('div');
+      original.className = 'specimen-original';
+      original.style.fontFamily = `"${name.replace(/"/g,'')}", "Zen Kaku Gothic New", sans-serif`;
+      original.textContent = name;
+
+      const sample = document.createElement('div');
+      sample.className = 'specimen-sample';
+      sample.style.fontFamily = `"${name.replace(/"/g,'')}", "Zen Kaku Gothic New", sans-serif`;
+      sample.textContent = 'あの日見た花　The quick brown fox 0123';
+
+      left.appendChild(label);
+      left.appendChild(original);
+      left.appendChild(sample);
+
+      const right = document.createElement('div');
+      right.className = 'specimen-right';
+      const inputLabel = document.createElement('label');
+      inputLabel.textContent = '変換後のフォント名';
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'font-input';
+      input.placeholder = '未入力ならそのまま';
+      input.dataset.originalFont = name;
+      input.addEventListener('input', () => {
+        input.classList.toggle('filled', input.value.trim().length > 0);
+      });
+      right.appendChild(inputLabel);
+      right.appendChild(input);
+
+      card.appendChild(left);
+      card.appendChild(right);
+      specimenGrid.appendChild(card);
+    });
+  }
+
+  themeToggle.addEventListener('change', () => {
+    themeInputs.classList.toggle('show', themeToggle.checked);
+  });
+
+  generateBtn.addEventListener('click', async () => {
+    if(!zip){ return; }
+
+    const replacements = {};
+    document.querySelectorAll('.font-input[data-original-font]').forEach(inp => {
+      const val = inp.value.trim();
+      if(val) replacements[inp.dataset.originalFont] = val;
+    });
+
+    const themeReplacements = themeToggle.checked ? {
+      majorLatin: document.getElementById('themeMajorLatin').value.trim(),
+      majorEa: document.getElementById('themeMajorEa').value.trim(),
+      minorLatin: document.getElementById('themeMinorLatin').value.trim(),
+      minorEa: document.getElementById('themeMinorEa').value.trim()
+    } : null;
+
+    if(Object.keys(replacements).length === 0 && !themeReplacements){
+      generateStatus.textContent = '差し替え先のフォント名を1つ以上入力してください。';
+      generateStatus.classList.add('err');
+      return;
+    }
+
+    generateStatus.classList.remove('err');
+    generateBtn.disabled = true;
+    generateBtn.innerHTML = '<span class="spinner"></span>変換中...';
+    generateStatus.textContent = '';
+
+    try{
+      await applyReplacements(replacements, themeReplacements);
+      const blob = await zip.generateAsync({
+        type: 'blob',
+        mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+      });
+      if(generatedBlobUrl) URL.revokeObjectURL(generatedBlobUrl);
+      generatedBlobUrl = URL.createObjectURL(blob);
+      downloadBtn.href = generatedBlobUrl;
+      downloadBtn.setAttribute('download', originalFileName + '_変換後.pptx');
+      const kb = (blob.size / 1024).toFixed(0);
+      downloadMeta.textContent = `${originalFileName}_変換後.pptx （${kb} KB）`;
+      downloadCard.classList.add('show');
+      downloadCard.scrollIntoView({behavior:'smooth', block:'center'});
+    }catch(err){
+      console.error(err);
+      generateStatus.textContent = '変換中にエラーが発生しました。';
+      generateStatus.classList.add('err');
+    }finally{
+      generateBtn.disabled = false;
+      generateBtn.textContent = '変換してファイルを生成';
+    }
+  });
+
+  async function applyReplacements(replacements, themeReplacements){
+    // 1. Replace in all slide XML files
+    const slideFiles = getSlideFiles();
+    for(const path of slideFiles){
+      let xmlText = await zip.file(path).async('string');
+      xmlText = replaceTypefacesInXmlString(xmlText, replacements);
+      zip.file(path, xmlText);
+    }
+
+    // 2. Optionally replace theme fonts (slideMaster themes)
+    if(themeReplacements){
+      const themeFiles = Object.keys(zip.files).filter(n => /^ppt\/theme\/theme\d+\.xml$/.test(n));
+      for(const path of themeFiles){
+        let xmlText = await zip.file(path).async('string');
+        xmlText = replaceThemeFonts(xmlText, themeReplacements);
+        zip.file(path, xmlText);
+      }
+    }
+  }
+
+  function escapeRegExp(str){
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  function replaceTypefacesInXmlString(xmlText, replacements){
+    // Replace typeface="X" for a:latin, a:ea, a:cs where X matches a key in replacements
+    Object.keys(replacements).forEach(orig => {
+      const newFont = replacements[orig];
+      const escapedOrig = escapeRegExp(orig);
+      // matches <a:latin typeface="orig" .../> or with other attrs before/after typeface
+      const re = new RegExp('(<a:(?:latin|ea|cs)[^>]*\\btypeface=")' + escapedOrig + '(")', 'g');
+      xmlText = xmlText.replace(re, '$1' + newFont.replace(/[$]/g, '$$$$') + '$2');
+    });
+    return xmlText;
+  }
+
+  function replaceThemeFonts(xmlText, t){
+    // majorFont / minorFont blocks contain <a:latin>, <a:ea>, <a:cs>, and per-script
+    // <a:font script="Jpan" typeface="..."/> entries. Japanese UI fonts usually live
+    // in the Jpan-script entry (ea is often left blank), so we update both.
+    if(t.majorLatin){
+      xmlText = replaceWithinBlock(xmlText, 'majorFont', 'latin', t.majorLatin);
+    }
+    if(t.majorEa){
+      xmlText = replaceWithinBlock(xmlText, 'majorFont', 'ea', t.majorEa);
+      xmlText = replaceScriptFontWithinBlock(xmlText, 'majorFont', 'Jpan', t.majorEa);
+    }
+    if(t.minorLatin){
+      xmlText = replaceWithinBlock(xmlText, 'minorFont', 'latin', t.minorLatin);
+    }
+    if(t.minorEa){
+      xmlText = replaceWithinBlock(xmlText, 'minorFont', 'ea', t.minorEa);
+      xmlText = replaceScriptFontWithinBlock(xmlText, 'minorFont', 'Jpan', t.minorEa);
+    }
+    return xmlText;
+  }
+
+  function replaceWithinBlock(xmlText, blockTag, subTag, newFont){
+    const blockRe = new RegExp('(<a:' + blockTag + '[^>]*>)([\\s\\S]*?)(<\\/a:' + blockTag + '>)');
+    const m = xmlText.match(blockRe);
+    if(!m) return xmlText;
+    let inner = m[2];
+    const subRe = new RegExp('(<a:' + subTag + '\\b[^>]*\\btypeface=")[^"]*(")');
+    if(subRe.test(inner)){
+      inner = inner.replace(subRe, '$1' + newFont.replace(/[$]/g,'$$$$') + '$2');
+    }
+    return xmlText.slice(0, m.index) + m[1] + inner + m[3] + xmlText.slice(m.index + m[0].length);
+  }
+
+  function replaceScriptFontWithinBlock(xmlText, blockTag, script, newFont){
+    const blockRe = new RegExp('(<a:' + blockTag + '[^>]*>)([\\s\\S]*?)(<\\/a:' + blockTag + '>)');
+    const m = xmlText.match(blockRe);
+    if(!m) return xmlText;
+    let inner = m[2];
+    const subRe = new RegExp('(<a:font\\b[^>]*\\bscript="' + script + '"[^>]*\\btypeface=")[^"]*(")');
+    if(subRe.test(inner)){
+      inner = inner.replace(subRe, '$1' + newFont.replace(/[$]/g,'$$$$') + '$2');
+    }
+    return xmlText.slice(0, m.index) + m[1] + inner + m[3] + xmlText.slice(m.index + m[0].length);
+  }
+
+})();
+</script>
+</body>
+</html>
