@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>活字帳 — PowerPointフォント一括変換</title>
+<title>活字帳 — Office文書フォント一括変換</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;500;600;800&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap" rel="stylesheet">
@@ -150,6 +150,12 @@ input[type=file]{ display:none; }
   font-size:13px; text-decoration:underline; padding:4px;
 }
 .file-chip .clear:hover{ color:var(--vermilion-soft); }
+.format-badge{
+  font-family:"Shippori Mincho", serif;
+  font-size:11px; letter-spacing:0.08em;
+  background:rgba(198,67,46,0.18); color:var(--vermilion-soft);
+  border-radius:3px; padding:4px 9px; flex:none;
+}
 
 /* ---------- specimen cards (font list) ---------- */
 #specimenSection{ display:none; }
@@ -303,8 +309,8 @@ footer .rule{ width:1px; height:36px; background:var(--line-strong); margin:0 au
 <div class="wrap">
   <header class="hero">
     <p class="eyebrow">TYPE SPECIMEN &amp; REPLACEMENT TOOL</p>
-    <h1 class="title">活字帳<span class="accent">。</span><br>PowerPoint フォント一括変換</h1>
-    <p class="lede">ファイルを開かずに、使われているフォントを洗い出し、まとめて差し替える。すべてブラウザの中だけで完結し、ファイルはどこにも送信されません。</p>
+    <h1 class="title">活字帳<span class="accent">。</span><br>Office文書 フォント一括変換</h1>
+    <p class="lede">ファイルを開かずに、使われているフォントを洗い出し、まとめて差し替える。PowerPoint（.pptx）・Word（.docx）に両対応、形式は自動で判別します。すべてブラウザの中だけで完結し、ファイルはどこにも送信されません。</p>
     <div class="hero-rule"><span class="dash"></span>UPLOAD → DETECT → REPLACE → DOWNLOAD<span class="dash"></span></div>
   </header>
 
@@ -313,18 +319,19 @@ footer .rule{ width:1px; height:36px; background:var(--line-strong); margin:0 au
       <span class="step-num">01</span>
       <div>
         <h2 class="step-title">ファイルを読み込む</h2>
-        <p class="step-sub">.pptx ファイルをドラッグ＆ドロップ、またはクリックして選択</p>
+        <p class="step-sub">.pptx（PowerPoint）または .docx（Word）ファイルをドラッグ＆ドロップ、またはクリックして選択 — 形式は自動判別されます</p>
       </div>
     </div>
 
-    <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="PowerPointファイルを選択">
+    <div class="dropzone" id="dropzone" tabindex="0" role="button" aria-label="PowerPointまたはWordファイルを選択">
       <div class="dropzone-icon">↑</div>
       <div class="dropzone-text"><b>ここにドロップ</b> — またはクリックしてファイルを選択</div>
-      <div class="dropzone-meta">.pptx ファイルのみ対応</div>
-      <input type="file" id="fileInput" accept=".pptx">
+      <div class="dropzone-meta">.pptx / .docx ファイルに対応</div>
+      <input type="file" id="fileInput" accept=".pptx,.docx">
     </div>
 
     <div class="file-chip" id="fileChip">
+      <span class="format-badge" id="formatBadge"></span>
       <span class="name" id="fileName"></span>
       <button class="clear" id="clearFile">取り消す</button>
     </div>
@@ -345,8 +352,8 @@ footer .rule{ width:1px; height:36px; background:var(--line-strong); margin:0 au
 
     <div class="theme-row">
       <div class="theme-row-text">
-        <b>テーマフォント（スライドマスター／レイアウト）も変換する</b>
-        <span>タイトルや本文の既定フォント設定。通常は本文テキストの変換だけで十分です</span>
+        <b id="themeRowTitle">テーマフォント（スライドマスター／レイアウト）も変換する</b>
+        <span id="themeRowSub">タイトルや本文の既定フォント設定。通常は本文テキストの変換だけで十分です</span>
       </div>
       <label class="switch">
         <input type="checkbox" id="themeToggle">
@@ -400,11 +407,20 @@ footer .rule{ width:1px; height:36px; background:var(--line-strong); margin:0 au
   "use strict";
 
   const NS_A = "http://schemas.openxmlformats.org/drawingml/2006/main";
+  const NS_W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 
   let zip = null;
+  let format = null; // 'pptx' | 'docx'
   let originalFileName = "presentation";
-  let fontMap = {}; // originalFontName -> { count, sampleText }
+  let fontMap = {}; // originalFontName -> { count }
   let generatedBlobUrl = null;
+
+  const FORMAT_LABEL = { pptx: 'PowerPoint', docx: 'Word' };
+  const FORMAT_EXT = { pptx: '.pptx', docx: '.docx' };
+  const FORMAT_MIME = {
+    pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  };
 
   const dropzone = document.getElementById('dropzone');
   const fileInput = document.getElementById('fileInput');
@@ -444,6 +460,7 @@ footer .rule{ width:1px; height:36px; background:var(--line-strong); margin:0 au
 
   function resetAll(){
     zip = null;
+    format = null;
     fontMap = {};
     fileInput.value = '';
     fileChip.classList.remove('show');
@@ -454,72 +471,134 @@ footer .rule{ width:1px; height:36px; background:var(--line-strong); margin:0 au
     if(generatedBlobUrl){ URL.revokeObjectURL(generatedBlobUrl); generatedBlobUrl = null; }
   }
 
+  // --- Format detection -----------------------------------------------
+  // Prefer sniffing the zip contents over trusting the extension, since a
+  // user could rename a file. We fall back to the extension only if the
+  // internal structure is ambiguous.
+  function detectFormat(zipObj, fileNameLower){
+    const names = Object.keys(zipObj.files);
+    const hasSlides = names.some(n => /^ppt\/slides\/slide\d+\.xml$/.test(n));
+    const hasPresentationXml = names.includes('ppt/presentation.xml');
+    const hasDocumentXml = names.includes('word/document.xml');
+    if(hasSlides || hasPresentationXml) return 'pptx';
+    if(hasDocumentXml) return 'docx';
+    // ambiguous — fall back to extension
+    if(fileNameLower.endsWith('.docx')) return 'docx';
+    if(fileNameLower.endsWith('.pptx')) return 'pptx';
+    return null;
+  }
+
   async function handleFile(file){
-    if(!file.name.toLowerCase().endsWith('.pptx')){
-      uploadStatus.textContent = '.pptx ファイルを選択してください。';
+    const lower = file.name.toLowerCase();
+    if(!lower.endsWith('.pptx') && !lower.endsWith('.docx')){
+      uploadStatus.textContent = '.pptx または .docx ファイルを選択してください。';
       uploadStatus.classList.add('err');
       return;
     }
     uploadStatus.classList.remove('err');
     uploadStatus.textContent = '読み込み中...';
-    originalFileName = file.name.replace(/\.pptx$/i, '');
+    originalFileName = file.name.replace(/\.(pptx|docx)$/i, '');
     fileName.textContent = file.name;
     fileChip.classList.add('show');
 
     try{
       const buf = await file.arrayBuffer();
       zip = await JSZip.loadAsync(buf);
+
+      format = detectFormat(zip, lower);
+      if(!format){
+        throw new Error('unrecognized-format');
+      }
+      document.getElementById('formatBadge').textContent = FORMAT_LABEL[format];
+      updateThemeCopy();
+
       await scanFonts();
-      uploadStatus.textContent = `完了 — ${Object.keys(fontMap).length} 種類のフォントを検出しました`;
+      uploadStatus.textContent = `完了 — ${FORMAT_LABEL[format]}ファイルとして ${Object.keys(fontMap).length} 種類のフォントを検出しました`;
       renderSpecimens();
       specimenSection.classList.add('show');
       specimenSection.scrollIntoView({behavior:'smooth', block:'start'});
     }catch(err){
       console.error(err);
+      zip = null; format = null;
       uploadStatus.classList.add('err');
-      uploadStatus.textContent = 'ファイルの読み込みに失敗しました。有効な .pptx ファイルか確認してください。';
+      uploadStatus.textContent = 'ファイルの読み込みに失敗しました。有効な .pptx / .docx ファイルか確認してください。';
     }
   }
 
-  function getSlideFiles(){
+  function updateThemeCopy(){
+    const title = document.getElementById('themeRowTitle');
+    const sub = document.getElementById('themeRowSub');
+    if(format === 'pptx'){
+      title.textContent = 'テーマフォント（スライドマスター／レイアウト）も変換する';
+      sub.textContent = 'タイトルや本文の既定フォント設定。通常は本文テキストの変換だけで十分です';
+    }else{
+      title.textContent = 'テーマフォント（既定のスタイル設定）も変換する';
+      sub.textContent = '「標準」スタイルなど、文書全体の既定フォント設定。通常は本文テキストの変換だけで十分です';
+    }
+  }
+
+  // --- File enumeration per format -------------------------------------
+  function getContentXmlFiles(){
+    if(format === 'pptx'){
+      return Object.keys(zip.files)
+        .filter(name => /^ppt\/slides\/slide\d+\.xml$/.test(name))
+        .sort((a,b) => {
+          const na = parseInt(a.match(/slide(\d+)\.xml/)[1]);
+          const nb = parseInt(b.match(/slide(\d+)\.xml/)[1]);
+          return na - nb;
+        });
+    }
+    // docx: main body + headers/footers (styles.xml is handled separately as "theme")
     return Object.keys(zip.files)
-      .filter(name => /^ppt\/slides\/slide\d+\.xml$/.test(name))
-      .sort((a,b) => {
-        const na = parseInt(a.match(/slide(\d+)\.xml/)[1]);
-        const nb = parseInt(b.match(/slide(\d+)\.xml/)[1]);
-        return na - nb;
-      });
+      .filter(name => /^word\/(document|header\d+|footer\d+)\.xml$/.test(name));
   }
 
   async function scanFonts(){
     fontMap = {};
-    const slideFiles = getSlideFiles();
-    for(const path of slideFiles){
+    const files = getContentXmlFiles();
+    for(const path of files){
       const xmlText = await zip.file(path).async('string');
       const doc = new DOMParser().parseFromString(xmlText, 'application/xml');
-      collectFontsFromDoc(doc);
+      if(format === 'pptx'){
+        collectPptxFontsFromDoc(doc);
+      }else{
+        collectDocxFontsFromDoc(doc);
+      }
     }
   }
 
-  function collectFontsFromDoc(doc){
+  function addFont(name){
+    if(!name) return;
+    if(!fontMap[name]) fontMap[name] = { count: 0 };
+    fontMap[name].count++;
+  }
+
+  function collectPptxFontsFromDoc(doc){
     // collect typeface elements: a:latin, a:ea, a:cs within a:rPr / a:defRPr / a:endParaRPr
     const tags = ['latin', 'ea', 'cs'];
     tags.forEach(tag => {
       const els = doc.getElementsByTagNameNS(NS_A, tag);
       for(let i=0; i<els.length; i++){
-        const el = els[i];
-        const typeface = el.getAttribute('typeface');
-        if(!typeface || typeface === '+mj-lt' || typeface === '+mn-lt' ||
-           typeface === '+mj-ea' || typeface === '+mn-ea' ||
-           typeface === '+mj-cs' || typeface === '+mn-cs'){
-          continue; // theme references, not literal font names
-        }
-        if(!fontMap[typeface]){
-          fontMap[typeface] = { count: 0 };
-        }
-        fontMap[typeface].count++;
+        const typeface = els[i].getAttribute('typeface');
+        if(!typeface || /^\+(mj|mn)-(lt|ea|cs)$/.test(typeface)) continue; // theme references
+        addFont(typeface);
       }
     });
+  }
+
+  function collectDocxFontsFromDoc(doc){
+    // <w:rFonts w:ascii="..." w:hAnsi="..." w:eastAsia="..." w:cs="..."/>
+    // ascii/hAnsi/eastAsia/cs are literal names; asciiTheme/hAnsiTheme/eastAsiaTheme/cstheme
+    // are theme references and are skipped here (handled by the theme toggle).
+    const attrs = ['ascii', 'hAnsi', 'eastAsia', 'cs'];
+    const els = doc.getElementsByTagNameNS(NS_W, 'rFonts');
+    for(let i=0; i<els.length; i++){
+      const el = els[i];
+      attrs.forEach(attr => {
+        const val = el.getAttributeNS(NS_W, attr);
+        if(val) addFont(val);
+      });
+    }
   }
 
   function renderSpecimens(){
@@ -527,7 +606,7 @@ footer .rule{ width:1px; height:36px; background:var(--line-strong); margin:0 au
     const names = Object.keys(fontMap).sort((a,b) => fontMap[b].count - fontMap[a].count);
 
     if(names.length === 0){
-      specimenGrid.innerHTML = '<div class="specimen-card"><div class="specimen-left"><div class="specimen-original">明示的なフォント指定が見つかりませんでした</div><div class="specimen-sample">このファイルはテーマフォントのみを使用している可能性があります。下の「テーマフォントも変換する」をご利用ください。</div></div><div></div></div>';
+      specimenGrid.innerHTML = '<div class="specimen-card"><div class="specimen-left"><div class="specimen-original">明示的なフォント指定が見つかりませんでした</div><div class="specimen-sample">このファイルはテーマ（既定スタイル）のフォントのみを使用している可能性があります。下の「テーマフォントも変換する」をご利用ください。</div></div><div></div></div>';
       return;
     }
 
@@ -614,14 +693,15 @@ footer .rule{ width:1px; height:36px; background:var(--line-strong); margin:0 au
       await applyReplacements(replacements, themeReplacements);
       const blob = await zip.generateAsync({
         type: 'blob',
-        mimeType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+        mimeType: FORMAT_MIME[format]
       });
       if(generatedBlobUrl) URL.revokeObjectURL(generatedBlobUrl);
       generatedBlobUrl = URL.createObjectURL(blob);
+      const outName = originalFileName + '_変換後' + FORMAT_EXT[format];
       downloadBtn.href = generatedBlobUrl;
-      downloadBtn.setAttribute('download', originalFileName + '_変換後.pptx');
+      downloadBtn.setAttribute('download', outName);
       const kb = (blob.size / 1024).toFixed(0);
-      downloadMeta.textContent = `${originalFileName}_変換後.pptx （${kb} KB）`;
+      downloadMeta.textContent = `${outName} （${kb} KB）`;
       downloadCard.classList.add('show');
       downloadCard.scrollIntoView({behavior:'smooth', block:'center'});
     }catch(err){
@@ -635,21 +715,39 @@ footer .rule{ width:1px; height:36px; background:var(--line-strong); margin:0 au
   });
 
   async function applyReplacements(replacements, themeReplacements){
-    // 1. Replace in all slide XML files
-    const slideFiles = getSlideFiles();
-    for(const path of slideFiles){
+    // 1. Replace in all content XML files (slides, or document/headers/footers)
+    const files = getContentXmlFiles();
+    for(const path of files){
       let xmlText = await zip.file(path).async('string');
-      xmlText = replaceTypefacesInXmlString(xmlText, replacements);
+      xmlText = (format === 'pptx')
+        ? replacePptxTypefaces(xmlText, replacements)
+        : replaceDocxTypefaces(xmlText, replacements);
       zip.file(path, xmlText);
     }
 
-    // 2. Optionally replace theme fonts (slideMaster themes)
+    // 2. Optionally replace theme fonts
     if(themeReplacements){
-      const themeFiles = Object.keys(zip.files).filter(n => /^ppt\/theme\/theme\d+\.xml$/.test(n));
-      for(const path of themeFiles){
-        let xmlText = await zip.file(path).async('string');
-        xmlText = replaceThemeFonts(xmlText, themeReplacements);
-        zip.file(path, xmlText);
+      if(format === 'pptx'){
+        const themeFiles = Object.keys(zip.files).filter(n => /^ppt\/theme\/theme\d+\.xml$/.test(n));
+        for(const path of themeFiles){
+          let xmlText = await zip.file(path).async('string');
+          xmlText = replacePptxThemeFonts(xmlText, themeReplacements);
+          zip.file(path, xmlText);
+        }
+      }else{
+        // docx: theme1.xml holds majorFont/minorFont (same schema as pptx theme),
+        // and styles.xml may additionally pin fonts directly on the Normal/Heading styles.
+        const themeFiles = Object.keys(zip.files).filter(n => /^word\/theme\/theme\d+\.xml$/.test(n));
+        for(const path of themeFiles){
+          let xmlText = await zip.file(path).async('string');
+          xmlText = replacePptxThemeFonts(xmlText, themeReplacements); // same block schema
+          zip.file(path, xmlText);
+        }
+        if(zip.file('word/styles.xml')){
+          let xmlText = await zip.file('word/styles.xml').async('string');
+          xmlText = replaceDocxStylesThemeFonts(xmlText, themeReplacements);
+          zip.file('word/styles.xml', xmlText);
+        }
       }
     }
   }
@@ -658,22 +756,36 @@ footer .rule{ width:1px; height:36px; background:var(--line-strong); margin:0 au
     return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
-  function replaceTypefacesInXmlString(xmlText, replacements){
-    // Replace typeface="X" for a:latin, a:ea, a:cs where X matches a key in replacements
+  // ---- pptx: <a:latin typeface="X"/>, <a:ea typeface="X"/>, <a:cs typeface="X"/> ----
+  function replacePptxTypefaces(xmlText, replacements){
     Object.keys(replacements).forEach(orig => {
       const newFont = replacements[orig];
       const escapedOrig = escapeRegExp(orig);
-      // matches <a:latin typeface="orig" .../> or with other attrs before/after typeface
       const re = new RegExp('(<a:(?:latin|ea|cs)[^>]*\\btypeface=")' + escapedOrig + '(")', 'g');
       xmlText = xmlText.replace(re, '$1' + newFont.replace(/[$]/g, '$$$$') + '$2');
     });
     return xmlText;
   }
 
-  function replaceThemeFonts(xmlText, t){
-    // majorFont / minorFont blocks contain <a:latin>, <a:ea>, <a:cs>, and per-script
-    // <a:font script="Jpan" typeface="..."/> entries. Japanese UI fonts usually live
-    // in the Jpan-script entry (ea is often left blank), so we update both.
+  // ---- docx: <w:rFonts w:ascii="X" w:hAnsi="X" w:eastAsia="X" w:cs="X"/> ----
+  function replaceDocxTypefaces(xmlText, replacements){
+    Object.keys(replacements).forEach(orig => {
+      const newFont = replacements[orig];
+      const escapedOrig = escapeRegExp(orig);
+      const escapedNew = newFont.replace(/[$]/g, '$$$$');
+      ['ascii', 'hAnsi', 'eastAsia', 'cs'].forEach(attr => {
+        const re = new RegExp('(\\bw:' + attr + '=")' + escapedOrig + '(")', 'g');
+        xmlText = xmlText.replace(re, '$1' + escapedNew + '$2');
+      });
+    });
+    return xmlText;
+  }
+
+  // ---- shared theme block schema (pptx theme1.xml AND docx word/theme/theme1.xml) ----
+  // majorFont / minorFont blocks contain <a:latin>, <a:ea>, <a:cs>, and per-script
+  // <a:font script="Jpan" typeface="..."/> entries. Japanese UI fonts usually live
+  // in the Jpan-script entry (ea is often left blank), so we update both.
+  function replacePptxThemeFonts(xmlText, t){
     if(t.majorLatin){
       xmlText = replaceWithinBlock(xmlText, 'majorFont', 'latin', t.majorLatin);
     }
@@ -713,6 +825,41 @@ footer .rule{ width:1px; height:36px; background:var(--line-strong); margin:0 au
       inner = inner.replace(subRe, '$1' + newFont.replace(/[$]/g,'$$$$') + '$2');
     }
     return xmlText.slice(0, m.index) + m[1] + inner + m[3] + xmlText.slice(m.index + m[0].length);
+  }
+
+  // ---- docx styles.xml: Normal/Heading* styles often pin rFonts directly (asciiTheme
+  // etc. reference the theme, but some templates set literal ascii/eastAsia too). We
+  // treat "major" as the Heading/Title styles' fonts and "minor" as the Normal style's.
+  function replaceDocxStylesThemeFonts(xmlText, t){
+    const doc = new DOMParser().parseFromString(xmlText, 'application/xml');
+    const styleEls = Array.from(doc.getElementsByTagNameNS(NS_W, 'style'));
+
+    styleEls.forEach(styleEl => {
+      const styleId = styleEl.getAttributeNS(NS_W, 'styleId') || '';
+      const isHeading = /^Heading/i.test(styleId) || /^Title$/i.test(styleId);
+      const isNormal = /^Normal$/i.test(styleId);
+      if(!isHeading && !isNormal) return;
+
+      const rFontsEls = styleEl.getElementsByTagNameNS(NS_W, 'rFonts');
+      for(let i=0; i<rFontsEls.length; i++){
+        const el = rFontsEls[i];
+        const latinVal = isHeading ? t.majorLatin : t.minorLatin;
+        const eaVal = isHeading ? t.majorEa : t.minorEa;
+        if(latinVal){
+          if(el.getAttributeNS(NS_W, 'ascii')) el.setAttributeNS(NS_W, 'w:ascii', latinVal);
+          if(el.getAttributeNS(NS_W, 'hAnsi')) el.setAttributeNS(NS_W, 'w:hAnsi', latinVal);
+        }
+        if(eaVal && el.getAttributeNS(NS_W, 'eastAsia')){
+          el.setAttributeNS(NS_W, 'w:eastAsia', eaVal);
+        }
+      }
+    });
+
+    // XMLSerializer drops the <?xml ...?> declaration; Word tolerates its absence,
+    // but we restore it from the original text to keep the file maximally compatible.
+    const declMatch = xmlText.match(/^<\?xml[^>]*\?>/);
+    const decl = declMatch ? declMatch[0] : '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+    return decl + new XMLSerializer().serializeToString(doc);
   }
 
 })();
